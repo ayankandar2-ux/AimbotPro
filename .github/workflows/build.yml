@@ -1,10 +1,16 @@
-name: Android Build
+name: Build APK
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -12,17 +18,39 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
           java-version: '17'
+          distribution: 'temurin'
 
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          # Ensure these packages are installed for your build
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      - name: Make gradlew executable
+      - name: Install NDK
+        run: sdkmanager "ndk;25.1.8937393"
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-      
-      - name: Build project
-        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Add Jetifier ignore for OpenCV
+        run: |
+          grep -q "android.jetifier.ignoreList" gradle.properties || \
+          echo "android.jetifier.ignoreList=opencv" >> gradle.properties
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
