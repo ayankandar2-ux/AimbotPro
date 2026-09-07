@@ -1,57 +1,58 @@
-name: Build
+name: Build APK
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      ACTIONS_ALLOW_USE_NODE20: true
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # NEW STEP: List files to see where your project is
-      - name: List root directory
-        run: ls -la
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
           java-version: '17'
-
-      - name: Accept Android SDK licenses
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        shell: bash
+          distribution: 'temurin'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            build-tools;34.0.0
+            platforms;android-34
+            ndk;25.1.8937393
+            cmake;3.22.1
 
-      # FIXED: Handles nested folder structure
-      - name: Make gradlew executable
-        run: |
-          chmod +x gradlew || chmod +x android/gradlew
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses
 
-      # FIXED: Runs the correct build command based on location
-      - name: Build Debug APK
+      - name: Generate Gradle wrapper if missing
         run: |
-          if [ -f "gradlew" ]; then
-            ./gradlew assembleDebug
+          if [ ! -f gradlew ]; then
+            echo "Gradle wrapper not found, generating..."
+            wget https://services.gradle.org/distributions/gradle-8.4-bin.zip -O gradle.zip
+            unzip gradle.zip -d /tmp/
+            /tmp/gradle-8.4/bin/gradle wrapper
+            rm -rf gradle.zip /tmp/gradle-8.4
           else
-            cd android && ./gradlew assembleDebug
+            echo "gradlew found."
           fi
 
-      - name: Upload APK artifact
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: AimbotPro-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
