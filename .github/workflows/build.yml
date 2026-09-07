@@ -1,14 +1,10 @@
-name: Build APK (Manual SDK)
+name: Android Build
 
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,49 +12,17 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Install Android SDK, NDK, CMake and accept licenses
-        run: |
-          # Install Android command-line tools
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip -d $HOME/android-sdk
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          mv $HOME/android-sdk/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          export PATH=$ANDROID_SDK_ROOT/platform-tools:$PATH
-
-          # Accept all licenses non-interactively
-          yes | sdkmanager --licenses
-
-          # Install required packages
-          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" "ndk;25.1.8937393" "cmake;3.22.1"
-
-          # Set environment for later steps
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
-
-      - name: Generate Gradle wrapper if missing
-        run: |
-          if [ ! -f gradlew ]; then
-            wget https://services.gradle.org/distributions/gradle-8.4-bin.zip -O gradle.zip
-            unzip gradle.zip -d /tmp/
-            /tmp/gradle-8.4/bin/gradle wrapper
-            rm -rf gradle.zip /tmp/gradle-8.4
-          fi
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # Ensure these packages are installed for your build
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
       - name: Make gradlew executable
         run: chmod +x gradlew
-
-      - name: Build APK
-        run: ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: AimbotPro-debug
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 7
+      
+      - name: Build project
+        run: ./gradlew --no-daemon assembleDebug
