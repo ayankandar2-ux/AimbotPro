@@ -25,10 +25,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # --- THE CRITICAL FIX ---
-      # Piping "yes" to sdkmanager automatically accepts all licenses 
-      # (including the Google TV Add-on license) and writes the hash files, 
-      # preventing the interactive prompt that caused the failure.
+      # Keep your working license fix
       - name: Accept Android SDK licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -37,6 +34,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # Add your actual build steps here (e.g., Building with Gradle)
-      # - name: Build with Gradle
-      #   run: ./gradlew assembleDebug
+      # NEW: Make the Gradle wrapper executable
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # NEW: Actually build the APK
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      # NEW: Upload the APK so you can download it
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
